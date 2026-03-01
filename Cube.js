@@ -118,6 +118,15 @@ class Cube {
           0,0, 1,1, 1,0,  0,0, 0,1, 1,1, // Left
           0,0, 1,1, 1,0,  0,0, 0,1, 1,1  // Right
         ]);
+
+        this.cubeNormals = new Float32Array([
+          0,0,-1, 0,0,-1, 0,0,-1,  0,0,-1, 0,0,-1, 0,0,-1,
+          0,0,1,  0,0,1,  0,0,1,   0,0,1,  0,0,1,  0,0,1,
+          0,1,0,  0,1,0,  0,1,0,   0,1,0,  0,1,0,  0,1,0,
+          0,-1,0, 0,-1,0, 0,-1,0,  0,-1,0, 0,-1,0, 0,-1,0,
+          -1,0,0, -1,0,0, -1,0,0,  -1,0,0, -1,0,0, -1,0,0,
+          1,0,0,  1,0,0,  1,0,0,   1,0,0,  1,0,0,  1,0,0
+        ]);
     }
 
     renderfast() {
@@ -126,21 +135,29 @@ class Cube {
         gl.uniform4f(u_FragColor, rgba[0], rgba[1], rgba[2], rgba[3]);
         gl.uniformMatrix4fv(u_ModelMatrix, false, this.matrix.elements);
 
-        // Write Position data into the buffer
+        var normalMatrix = new Matrix4();
+        normalMatrix.setInverseOf(this.matrix);
+        normalMatrix.transpose();
+        gl.uniformMatrix4fv(u_NormalMatrix, false, normalMatrix.elements);
+
         var vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, this.cubeVerts, gl.DYNAMIC_DRAW);
         gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(a_Position);
 
-        // Write UV data into the buffer
         var uvBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, this.cubeUVs, gl.DYNAMIC_DRAW);
         gl.vertexAttribPointer(a_UV, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(a_UV);
 
-        // Draw all 36 vertices at once
+        var normalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.cubeNormals, gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(a_Normal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Normal);
+
         gl.drawArrays(gl.TRIANGLES, 0, 36);
     }
 }

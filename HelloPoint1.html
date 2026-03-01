@@ -6,22 +6,32 @@
   </head>
 
   <body onload="main()">
-    To Place blocks Click, To Destory Right Click
-    WASD to move, move mouse to look around, can fly looking up and down.
-    Extra WOW: Pick a texture and place blocks with it. 
+    <p>
+    Light R <input type="range" min="0" max="100" value="100" class="slider" id="lightColorR">
+    Light G <input type="range" min="0" max="100" value="100" class="slider" id="lightColorG">
+    Light B <input type="range" min="0" max="100" value="100" class="slider" id="lightColorB">
+  </p>
+    <p>
+    Spotlight Pos X <input type="range" min="-250" max="250" value="0" class="slider" id="spotPosX">
+    Spotlight Pos Y <input type="range" min="-250" max="250" value="200" class="slider" id="spotPosY">
+    Spotlight Pos Z <input type="range" min="-250" max="250" value="0" class="slider" id="spotPosZ">
+  </p>
+  Lighting Calculation:
+  <button type="button" id="lightOn">ON</button>
+  <button type="button" id="lightOff">OFF</button>
+  <p>
+  Light Animation: 
+  <button type="button" id="lightAnimationOnButton">ON</button>
+  <button type="button" id="lightAnimationOffButton">OFF</button>
+</p>
     <p></p>
-    Texture:
-    <button type="button" id="texWood">Wood</button>
-    <button type="button" id="texGrass">Grass</button>
-    <button type="button" id="texSky">Sky</button>
-    <button type="button" id="texColor">Solid Color</button>
-      Color Selection:
-      <button type="button" id="colorR" style="background-color:red">R</button>
-      <button type="button" id="colorO" style="background-color:orange">O</button>
-      <button type="button" id="colorY" style="background-color:yellow">Y</button>
-      <button type="button" id="colorG" style="background-color:green">G</button>
-      <button type="button" id="colorB" style="background-color:blue">B</button>
-      <button type="button" id="colorV" style="background-color:violet">V</button>
+    <p>
+    Light X <input type="range" min="-250" max="250" value="0" class="slider" id="lightSlideX">
+    Light Y <input type="range" min="-250" max="250" value="100" class="slider" id="lightSlideY">
+    Light Z <input type="range" min="-250" max="250" value="-200" class="slider" id="lightSlideZ">
+    </p>
+    <button type = "button" id ="NormalOn">NormalOn</button>
+    <button type = "button" id ="NormalOff">NormalOff</button>
     <canvas id="webgl" width="1200" height="600">
     Please use a browser that supports "canvas"
     </canvas>
@@ -36,6 +46,18 @@
     <button type = "button" id ="pointButton">X</button>
     <button type = "button" id ="circleButton">X</button>
 
+        Texture:
+    <button type="button" id="texWood">Wood</button>
+    <button type="button" id="texGrass">Grass</button>
+    <button type="button" id="texSky">Sky</button>
+    <button type="button" id="texColor">Solid Color</button>
+      Color Selection:
+      <button type="button" id="colorR" style="background-color:red">R</button>
+      <button type="button" id="colorO" style="background-color:orange">O</button>
+      <button type="button" id="colorY" style="background-color:yellow">Y</button>
+      <button type="button" id="colorG" style="background-color:green">G</button>
+      <button type="button" id="colorB" style="background-color:blue">B</button>
+      <button type="button" id="colorV" style="background-color:violet">V</button>
     <p>
     X <input type="range" min="0" max = "100" value="100" id="redSlide">
     <p>

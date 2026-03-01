@@ -7,35 +7,91 @@
 var VSHADER_SOURCE = `
   attribute vec4 a_Position;
   attribute vec2 a_UV;
+  attribute vec3 a_Normal;
   varying vec2 v_UV;
+  varying vec3 v_Normal; 
+  varying vec3 v_VertPos;
   uniform mat4 u_ModelMatrix;
+  uniform mat4 u_NormalMatrix;
   uniform mat4 u_GlobalRotateMatrix;
   uniform mat4 u_ViewMatrix;
   uniform mat4 u_ProjectionMatrix;
   void main() {
     gl_Position = u_ProjectionMatrix * u_ViewMatrix * u_GlobalRotateMatrix * u_ModelMatrix * a_Position;
     v_UV = a_UV;
+    v_Normal = normalize(vec3(u_NormalMatrix * vec4(a_Normal, 0.0)));
+    v_VertPos = vec3(u_ModelMatrix * a_Position);
   }`;
 
 var FSHADER_SOURCE =`
-  precision mediump float;
+precision highp float;
   varying vec2 v_UV;
+  varying vec3 v_Normal;
+  varying vec3 v_VertPos;
   uniform vec4 u_FragColor;
   uniform sampler2D u_Sampler0;
   uniform sampler2D u_Sampler1;
   uniform sampler2D u_Sampler2;
   uniform int u_whichTexture;
+  uniform vec3 u_cameraPos;  
+  uniform int u_lightOn;
+  uniform vec3 u_lightPos;
+  uniform vec3 u_lightColor; 
+  uniform int u_spotLightOn;
+  uniform vec3 u_spotLightPos;
+  uniform vec3 u_spotLightColor;
+  uniform vec3 u_spotLightDir;
+  uniform float u_spotLightCutoff;
   void main() {
-    if (u_whichTexture == -2) {
-      gl_FragColor = u_FragColor;
+    vec4 baseColor;
+    if (u_whichTexture == -3){
+      baseColor = vec4((v_Normal+1.0)/2.0, 1.0);
+    } else if (u_whichTexture == -2) {
+      baseColor = u_FragColor;
     } else if (u_whichTexture == 0) {
-      gl_FragColor = texture2D(u_Sampler1, v_UV); // grass
+      baseColor = texture2D(u_Sampler1, v_UV);
     } else if (u_whichTexture == 1) {
-      gl_FragColor = texture2D(u_Sampler0, v_UV); // sky
+      baseColor = texture2D(u_Sampler0, v_UV); 
     } else if (u_whichTexture == 2) {
-      gl_FragColor = texture2D(u_Sampler2, v_UV); // NEW: wood
+      baseColor = texture2D(u_Sampler2, v_UV); 
     } else {
-      gl_FragColor = vec4(v_UV, 1.0, 1.0); // UV Debug
+      baseColor = vec4(v_UV, 1.0, 1.0); 
+    }
+
+    vec3 N = normalize(v_Normal);
+    vec3 V = normalize(u_cameraPos - v_VertPos);
+    float shininess = 10.0;
+    vec3 ambient = vec3(baseColor) * 0.3; 
+    vec3 L_point = normalize(u_lightPos - v_VertPos);
+    vec3 R_point = reflect(-L_point, N);
+    float nDotL_point = max(dot(N, L_point), 0.0);
+    vec3 diffuse_point = u_lightColor * vec3(baseColor) * nDotL_point;
+    float specAmount_point = pow(max(dot(V, R_point), 0.0), shininess);
+    vec3 specular_point = u_lightColor * specAmount_point * 0.5;
+    vec3 diffuse_spot = vec3(0.0);
+    vec3 specular_spot = vec3(0.0);
+    if (u_spotLightOn == 1) {
+        vec3 L_spot = normalize(u_spotLightPos - v_VertPos);
+        vec3 R_spot = reflect(-L_spot, N);
+        vec3 lightToSurface = -L_spot; 
+        float spotDot = dot(lightToSurface, normalize(u_spotLightDir));
+        if (spotDot > u_spotLightCutoff) {
+            float spotFactor = pow(spotDot, 2.0);
+            float nDotL_spot = max(dot(N, L_spot), 0.0);
+            diffuse_spot = u_spotLightColor * vec3(baseColor) * nDotL_spot * spotFactor;
+            float specAmount_spot = pow(max(dot(V, R_spot), 0.0), shininess);
+            specular_spot = u_spotLightColor * specAmount_spot * 0.5 * spotFactor;
+        }
+    }
+
+    if (u_whichTexture == 1 || u_whichTexture == -3) {
+        gl_FragColor = baseColor; 
+    } else {
+        if (u_lightOn == 1) {
+            gl_FragColor = vec4(ambient + diffuse_point + specular_point + diffuse_spot + specular_spot, baseColor.a);
+        } else {
+            gl_FragColor = baseColor; 
+        }
     }
   }`;
 
@@ -44,7 +100,6 @@ let canvas;
 let gl;
 let a_Position;
 let u_FragColor;
-// \\let u_Size;
 let u_ModelMatrix;
 let u_GlobalRotateMatrix;
 let u_ProjectionMatrix
@@ -53,6 +108,27 @@ let u_UV;
 let v_UV;
 let a_UV;
 let u_Sampler2;
+let a_Normal;
+let u_lightPos;
+let g_lightColor = [1.0, 1.0, 1.0];
+let u_lightColor;
+let u_cameraPos;
+let u_NormalMatrix;
+let g_lightAnimation = true;
+let g_lightOn = true;
+let u_lightOn;
+
+let g_spotLightOn = true;
+let g_spotLightPos = [0, 2, 0];
+let g_spotLightColor = [1.0, 0.0, 0.0];
+let g_spotLightDir = [0.0, -1.0, 0.0];
+let g_spotLightCutoff = Math.cos(45.0 * Math.PI / 180.0); 
+
+let u_spotLightOn;
+let u_spotLightPos;
+let u_spotLightColor;
+let u_spotLightDir;
+let u_spotLightCutoff;
 // let g_globalAngle = 0;
 let g_globalAngle = 0;
 let g_globalAngleX = 0;
@@ -120,6 +196,15 @@ function connectVariablesToGLSL() {
     return;
   }
 
+  a_Normal = gl.getAttribLocation(gl.program, 'a_Normal');
+  if (a_Normal < 0) { 
+    console.log('Failed to get the storage location of a_Normal');
+  }
+
+  u_lightOn = gl.getUniformLocation(gl.program, 'u_lightOn');
+  if (!u_lightOn) {
+    console.log('Failed to get u_lightOn');
+  }
   
   // Get the storage location of u_FragColor
   u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
@@ -127,6 +212,18 @@ function connectVariablesToGLSL() {
     console.log('Failed to get the storage location of u_FragColor');
     return;
   }
+
+  u_lightPos = gl.getUniformLocation(gl.program, 'u_lightPos');
+  if (!u_lightPos) {
+    console.log('Failed to get the storage location of u_lightPos');
+    return;
+  }
+
+  u_spotLightOn = gl.getUniformLocation(gl.program, 'u_spotLightOn');
+  u_spotLightPos = gl.getUniformLocation(gl.program, 'u_spotLightPos');
+  u_spotLightColor = gl.getUniformLocation(gl.program, 'u_spotLightColor');
+  u_spotLightDir = gl.getUniformLocation(gl.program, 'u_spotLightDir');
+  u_spotLightCutoff = gl.getUniformLocation(gl.program, 'u_spotLightCutoff');
   
   u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
   if(!u_ModelMatrix){
@@ -171,6 +268,14 @@ function connectVariablesToGLSL() {
     return false;
   }
 
+  u_lightColor = gl.getUniformLocation(gl.program, 'u_lightColor');
+  u_cameraPos = gl.getUniformLocation(gl.program, 'u_cameraPos');
+  u_NormalMatrix = gl.getUniformLocation(gl.program, 'u_NormalMatrix');
+
+  if (!u_lightColor || !u_cameraPos || !u_NormalMatrix) {
+    console.log('Failed to get new lighting storage locations');
+  }
+
   // u_Size = gl.getUniformLocation(gl.program, 'u_Size');
   // if(!u_Size) {
   //  console.log('Failed to get the storage location of u_Size');
@@ -204,8 +309,47 @@ let g_wingFeatherAngle = 0;
 let g_wingFeatherAnimation = false;
 let g_selectedTexture = -2;
 let g_currentBlockColor = [1.0, 1.0, 1.0, 1.0];
+let g_normalOn = false;
+let g_lightPos = [0,1,2];
 
 function AddActionsForHtmlUI() {
+  document.getElementById('NormalOn').onclick = function() {
+    g_normalOn = true;
+    console.log("Normal Mode: ON", g_normalOn); // Debug statement
+  };
+  
+  document.getElementById('NormalOff').onclick = function() {
+    g_normalOn = false;
+    console.log("Normal Mode: OFF", g_normalOn);
+  };
+
+  document.getElementById('lightSlideX').addEventListener('mousemove', function(ev) { if(ev.buttons == 1) { g_lightPos[0] = this.value/100; renderAllShapes(); } });
+  document.getElementById('lightSlideY').addEventListener('mousemove', function(ev) { if(ev.buttons == 1) { g_lightPos[1] = this.value/100; renderAllShapes(); } });
+  document.getElementById('lightSlideZ').addEventListener('mousemove', function(ev) { if(ev.buttons == 1) { g_lightPos[2] = this.value/100; renderAllShapes(); } });
+
+  document.getElementById('lightAnimationOnButton').onclick = function() { g_lightAnimation = true; };
+  document.getElementById('lightAnimationOffButton').onclick = function() { g_lightAnimation = false; };
+
+  document.getElementById('lightColorR').addEventListener('mousemove', function(ev) { if(ev.buttons == 1) { g_lightColor[0] = this.value/100; renderAllShapes(); } });
+  document.getElementById('lightColorG').addEventListener('mousemove', function(ev) { if(ev.buttons == 1) { g_lightColor[1] = this.value/100; renderAllShapes(); } });
+  document.getElementById('lightColorB').addEventListener('mousemove', function(ev) { if(ev.buttons == 1) { g_lightColor[2] = this.value/100; renderAllShapes(); } });
+
+
+  document.getElementById('lightOn').onclick = function() { g_lightOn = true; renderAllShapes(); };
+  document.getElementById('lightOff').onclick = function() { g_lightOn = false; renderAllShapes(); };
+
+
+  // Spotlight Position Sliders
+  document.getElementById('spotPosX').addEventListener('mousemove', function(ev) { 
+      if(ev.buttons == 1) { g_spotLightPos[0] = this.value/100; renderAllShapes(); } 
+  });
+  document.getElementById('spotPosY').addEventListener('mousemove', function(ev) { 
+      if(ev.buttons == 1) { g_spotLightPos[1] = this.value/100; renderAllShapes(); } 
+  });
+  document.getElementById('spotPosZ').addEventListener('mousemove', function(ev) { 
+      if(ev.buttons == 1) { g_spotLightPos[2] = this.value/100; renderAllShapes(); } 
+  });
+
   document.getElementById('Green').onclick = function() {g_selectedColor = [0.0, 1.0, 0.0, 1.0]; };
   document.getElementById('Red').onclick = function() {g_selectedColor = [1.0, 0.0, 0.0, 1.0]; };
   document.getElementById('clearButton').onclick = function() {g_shapesList = []; renderAllShapes()};
@@ -379,6 +523,18 @@ function tick() {
 }
 
 function updateAnimationAngles(){
+  if (g_lightAnimation) {
+    // Radius of the light's orbit
+    const lightRadius = 3.0; 
+    
+    // Calculate new X and Z positions using sine and cosine for a circle
+    g_lightPos[0] = Math.cos(g_seconds) * lightRadius;
+    g_lightPos[2] = Math.sin(g_seconds) * lightRadius;
+    
+    // Optional: Keep Y constant, or make it bob up and down
+    // g_lightPos[1] = 2.0 + Math.sin(g_seconds * 2.0); 
+  }
+
   if(g_yellowAnimation){
     g_yellowAngle = (45*Math.sin(g_seconds));    
   }
@@ -639,18 +795,65 @@ function renderAllShapes() {
   var yellow = [0.95, 0.8, 0.2, 1.0];
   var black = [0.1, 0.1, 0.1, 1.0];
 
-    var floor = new Cube();
-    floor.textureNum = 0;
-    floor.matrix.translate(0, -.751, 0.0);
-    floor.matrix.scale(32, 0.001, 32);
-    floor.matrix.translate(-.5, 0, -0.5);
-    floor.renderfast();
+  gl.uniform1i(u_lightOn, g_lightOn ? 1 : 0);
+  gl.uniform3f(u_lightColor, g_lightColor[0], g_lightColor[1], g_lightColor[2]);
+  gl.uniform3f(u_cameraPos, g_camera.eye.elements[0], g_camera.eye.elements[1], g_camera.eye.elements[2]);
+
+  // Pass Point Light
+  gl.uniform3f(u_lightPos, g_lightPos[0], g_lightPos[1], g_lightPos[2]);
+  gl.uniform3f(u_lightColor, g_lightColor[0], g_lightColor[1], g_lightColor[2]);
+
+  // Pass Spotlight
+  gl.uniform1i(u_spotLightOn, g_spotLightOn ? 1 : 0);
+  gl.uniform3f(u_spotLightPos, g_spotLightPos[0], g_spotLightPos[1], g_spotLightPos[2]);
+  gl.uniform3f(u_spotLightColor, g_spotLightColor[0], g_spotLightColor[1], g_spotLightColor[2]);
+  gl.uniform3f(u_spotLightDir, g_spotLightDir[0], g_spotLightDir[1], g_spotLightDir[2]);
+  gl.uniform1f(u_spotLightCutoff, g_spotLightCutoff);
+
+  var floor = new Cube();
+  floor.textureNum = 0;
+  floor.matrix.translate(0, -.751, 0.0);
+  floor.matrix.scale(32, 0.001, 32);
+  floor.matrix.translate(-.5, 0, -0.5);
+  floor.renderfast();
 
   var sky = new Cube();
-  sky.textureNum = 1;
-  sky.matrix.scale(35,35,35);
-  sky.matrix.translate(-.5, -.5, -.5);
+  if (g_normalOn) {
+      sky.textureNum = -3;
+  } else {
+      sky.textureNum = 1; 
+  }
+  sky.matrix.scale(-15, -15, -15); 
+  sky.matrix.translate(-0.5, -0.5, -0.5);
   sky.renderfast();
+
+  gl.uniform3f(u_lightPos, g_lightPos[0], g_lightPos[1], g_lightPos[2]);
+
+  var light = new Cube();
+  light.color = [g_lightColor[0], g_lightColor[1], g_lightColor[2], 1];
+  light.textureNum = -2;
+  light.matrix.translate(g_lightPos[0], g_lightPos[1], g_lightPos[2]);
+  light.matrix.scale(0.1, 0.1, 0.1);
+  light.matrix.translate(-0.5, 5, -0.5);
+  light.renderfast();
+
+  var circle = new Sphere();
+  circle.matrix.translate(-.1, 1, -0.5);
+  if (g_normalOn) {
+      circle.textureNum = -3;
+  } else {
+      circle.textureNum = -2; 
+  }
+   circle.render();
+  if (g_spotLightOn) {
+      var spotLightCube = new Cube();
+      spotLightCube.color = [g_spotLightColor[0], g_spotLightColor[1], g_spotLightColor[2], 1];
+      spotLightCube.textureNum = -2;
+      spotLightCube.matrix.translate(g_spotLightPos[0], g_spotLightPos[1], g_spotLightPos[2]);
+      spotLightCube.matrix.scale(0.1, 0.1, 0.1);
+      spotLightCube.matrix.translate(-0.5, -0.5, -0.5);
+      spotLightCube.renderfast();
+  }
   /*
   // body
   var body = new Cube();

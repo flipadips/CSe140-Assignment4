@@ -1,8 +1,12 @@
 RYAN WONG
 ryrwong@ucsc.edu
 
+For Assignment 4:
+Used ChatGPT and Gemini mainly for fixing up the Shader/Verrex shader. Also used it formatting and implmenting the new sphere/triangle class. Also used it for implmenting the spotlight. 
+
+
 For Assingment 3:
-Used ChatGPT and mainly gemini for restructing many of the code, and helping with the effciency. Furthermore, helped with creating the buttons on the front page for HTML, and how to chooose the block/texture to place.
+Used ChatGPT and mainly gemini for restructing many of the code, and helping with the effciency and drawing the overall map. Furthermore, helped with creating the buttons on the front page for HTML, and how to chooose the block/texture to place.
 
 For assignment 2:
 Generated lines of code for helping create the custom poke animation, speicfically these lines:

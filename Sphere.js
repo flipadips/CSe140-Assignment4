@@ -1,65 +1,51 @@
 class Sphere {
-    constructor(){
-        this.type = "sphere";
+    constructor() {
+        this.type = 'sphere';
         this.color = [1.0, 1.0, 1.0, 1.0];
         this.matrix = new Matrix4();
-        this.segments = 16;
+        this.textureNum = -2;
     }
 
-    render(){
+    render() {
         var rgba = this.color;
-        gl.uniformMatrix4fv(u_ModelMatrix, false, this.matrix.elements);
+        gl.uniform1i(u_whichTexture, this.textureNum);
         gl.uniform4f(u_FragColor, rgba[0], rgba[1], rgba[2], rgba[3]);
+        gl.uniformMatrix4fv(u_ModelMatrix, false, this.matrix.elements);
 
-        // sphere vertices
-        var vertices = [];
-        var latitudeBands = this.segments;
-        var longitudeBands = this.segments;
+        var normalMatrix = new Matrix4();
+        normalMatrix.setInverseOf(this.matrix);
+        normalMatrix.transpose();
+        gl.uniformMatrix4fv(u_NormalMatrix, false, normalMatrix.elements);
 
-        // vertices for spheres
-        for (var latNumber = 0; latNumber <= latitudeBands; latNumber++) {
-            var theta = latNumber * Math.PI / latitudeBands;
-            var sinTheta = Math.sin(theta);
-            var cosTheta = Math.cos(theta);
+        var d = Math.PI / 10;
+        var dd = Math.PI / 10;
 
-            for (var longNumber = 0; longNumber <= longitudeBands; longNumber++) {
-                var phi = longNumber * 2 * Math.PI / longitudeBands;
-                var sinPhi = Math.sin(phi);
-                var cosPhi = Math.cos(phi);
+        for (var t = 0; t < Math.PI; t += d) {
+            for (var r = 0; r < (2 * Math.PI); r += d) {
+                var p1 = [Math.sin(t) * Math.cos(r), Math.sin(t) * Math.sin(r), Math.cos(t)];
+                var p2 = [Math.sin(t + dd) * Math.cos(r), Math.sin(t + dd) * Math.sin(r), Math.cos(t + dd)];
+                var p3 = [Math.sin(t) * Math.cos(r + dd), Math.sin(t) * Math.sin(r + dd), Math.cos(t)];
+                var p4 = [Math.sin(t + dd) * Math.cos(r + dd), Math.sin(t + dd) * Math.sin(r + dd), Math.cos(t + dd)];
 
-                var x = cosPhi * sinTheta;
-                var y = cosTheta;
-                var z = sinPhi * sinTheta;
+                // Triangle 1
+                var v = [];
+                var uv = [];
+                var n = [];
+                v = v.concat(p1); uv = uv.concat([0,0]); n = n.concat(p1);
+                v = v.concat(p2); uv = uv.concat([0,0]); n = n.concat(p2);
+                v = v.concat(p4); uv = uv.concat([0,0]); n = n.concat(p4);
+                
+                gl.uniform4f(u_FragColor, 1, 1, 1, 1);
+                drawTriangle3DUVNormal(v, uv, n);
 
-                vertices.push(x * 0.5, y * 0.5, z * 0.5);
-            }
-        }
-
-        // draw triangles for the sphere eyes
-        for (var latNumber = 0; latNumber < latitudeBands; latNumber++) {
-            for (var longNumber = 0; longNumber < longitudeBands; longNumber++) {
-                var first = (latNumber * (longitudeBands + 1)) + longNumber;
-                var second = first + longitudeBands + 1;
-
-                var i1 = first * 3;
-                var i2 = second * 3;
-                var i3 = (first + 1) * 3;
-
-                drawTriangle3D([
-                    vertices[i1], vertices[i1 + 1], vertices[i1 + 2],
-                    vertices[i2], vertices[i2 + 1], vertices[i2 + 2],
-                    vertices[i3], vertices[i3 + 1], vertices[i3 + 2]
-                ]);
-
-                i1 = second * 3;
-                i2 = (second + 1) * 3;
-                i3 = (first + 1) * 3;
-
-                drawTriangle3D([
-                    vertices[i1], vertices[i1 + 1], vertices[i1 + 2],
-                    vertices[i2], vertices[i2 + 1], vertices[i2 + 2],
-                    vertices[i3], vertices[i3 + 1], vertices[i3 + 2]
-                ]);
+                // Triangle 2
+                v = []; uv = []; n = [];
+                v = v.concat(p1); uv = uv.concat([0,0]); n = n.concat(p1);
+                v = v.concat(p4); uv = uv.concat([0,0]); n = n.concat(p4);
+                v = v.concat(p3); uv = uv.concat([0,0]); n = n.concat(p3);
+                
+                gl.uniform4f(u_FragColor, 1, 1, 1, 1);
+                drawTriangle3DUVNormal(v, uv, n);
             }
         }
     }
