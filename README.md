@@ -2,7 +2,7 @@ RYAN WONG
 ryrwong@ucsc.edu
 
 For Assignment 4:
-Used ChatGPT and Gemini mainly for fixing up the Shader/Verrex shader. Also used it formatting and implmenting the new sphere/triangle class. Also used it for implmenting the spotlight. 
+Used ChatGPT and Gemini mainly for fixing up the Shader/Verrex shader. Also used it formatting and implmenting the new sphere/triangle class. Also used it for implmenting the spotlight, and formatting HTML.
 
 
 For Assingment 3:
